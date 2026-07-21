@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="description" content="随页浏览器扩展隐私政策" />
+  <title>隐私政策 · 随页</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f5f8fc;
+      --panel: #ffffff;
+      --panel-soft: #f8fafc;
+      --text: #172033;
+      --muted: #64748b;
+      --faint: #8a98ac;
+      --border: #dce5f0;
+      --blue: #2563eb;
+      --blue-dark: #163b72;
+      --blue-soft: #eaf2ff;
+      --green: #15803d;
+      --shadow: 0 16px 42px rgba(28, 51, 84, .09);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        color-scheme: dark;
+        --bg: #0d1420;
+        --panel: #141e2d;
+        --panel-soft: #182436;
+        --text: #e5edf8;
+        --muted: #a4b2c5;
+        --faint: #7f8ea3;
+        --border: #28384d;
+        --blue: #60a5fa;
+        --blue-dark: #bfdbfe;
+        --blue-soft: #172b49;
+        --green: #6ee7a0;
+        --shadow: 0 18px 46px rgba(0, 0, 0, .28);
+      }
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--text);
+      background: var(--bg);
+      font-family: Inter, "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+      font-size: 16px;
+      line-height: 1.75;
+    }
+    a { color: var(--blue); text-underline-offset: 3px; }
+    .page { width: min(920px, calc(100% - 32px)); margin: 0 auto; padding: 32px 0 64px; }
+    .hero, .policy-card {
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+    .hero { padding: 34px; }
+    .brand { display: flex; align-items: center; gap: 12px; color: var(--blue-dark); font-weight: 750; }
+    .brand svg { width: 36px; height: 36px; flex: 0 0 36px; }
+    h1 { margin: 24px 0 8px; font-size: clamp(30px, 5vw, 46px); line-height: 1.18; letter-spacing: -.035em; }
+    .lead { max-width: 680px; margin: 0; color: var(--muted); font-size: 17px; }
+    .meta { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 22px; color: var(--faint); font-size: 14px; }
+    .principles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 26px; }
+    .principle { padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--panel-soft); }
+    .principle b { display: block; margin-bottom: 3px; color: var(--blue-dark); font-size: 15px; }
+    .principle span { color: var(--muted); font-size: 14px; line-height: 1.55; }
+    .policy-card { margin-top: 18px; padding: 10px 34px 32px; }
+    section { padding: 25px 0; border-bottom: 1px solid var(--border); }
+    section:last-child { border-bottom: 0; }
+    h2 { margin: 0 0 10px; font-size: 20px; line-height: 1.4; }
+    p { margin: 8px 0; color: var(--muted); }
+    ul { margin: 10px 0 0; padding-left: 22px; color: var(--muted); }
+    li + li { margin-top: 7px; }
+    strong { color: var(--text); }
+    .notice { margin-top: 18px; padding: 16px 18px; border-left: 4px solid var(--blue); border-radius: 9px; background: var(--blue-soft); }
+    .notice strong { color: var(--blue-dark); }
+    .permission-list { display: grid; gap: 9px; padding: 0; list-style: none; }
+    .permission-list li { display: grid; grid-template-columns: 176px 1fr; gap: 14px; margin: 0; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel-soft); }
+    .permission-list code { color: var(--blue-dark); font: 650 13px/1.6 ui-monospace, SFMono-Regular, Consolas, monospace; overflow-wrap: anywhere; }
+    .limited-use { border-color: color-mix(in srgb, var(--green) 28%, var(--border)); background: color-mix(in srgb, var(--green) 7%, var(--panel)); }
+    footer { padding: 24px 4px 0; color: var(--faint); font-size: 14px; text-align: center; }
+    @media (max-width: 680px) {
+      .page { width: min(100% - 20px, 920px); padding-top: 10px; }
+      .hero, .policy-card { border-radius: 14px; }
+      .hero { padding: 24px 20px; }
+      .policy-card { padding: 6px 20px 24px; }
+      .principles { grid-template-columns: 1fr; }
+      .permission-list li { grid-template-columns: 1fr; gap: 4px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <div class="brand">
+        <svg viewBox="0 0 128 128" aria-hidden="true">
+          <rect x="6" y="6" width="116" height="116" rx="27" fill="#eff6ff" stroke="#bfdbfe" stroke-width="4"/>
+          <rect x="17" y="27" width="94" height="78" rx="10" fill="#fff"/>
+          <path d="M27 27h60l24 24v8H17V37c0-5.52 4.48-10 10-10Z" fill="#163b72"/>
+          <path d="M87 27v14c0 5.52 4.48 10 10 10h14L87 27Z" fill="#60a5fa"/>
+          <path d="m61 65 7 34 8-11 12 15 8-6-12-15 13-5-36-12Z" fill="#2563eb" stroke="#fff" stroke-width="3" stroke-linejoin="round"/>
+        </svg>
+        <span>随页 · 浏览器侧边效率工具</span>
+      </div>
+      <h1>隐私政策</h1>
+      <p class="lead">本政策说明随页浏览器扩展如何在用户主动使用相关功能时处理、保存和保护数据。</p>
+      <div class="meta"><span>生效日期：2026 年 7 月 21 日</span><span>最近更新：2026 年 7 月 21 日</span></div>
+      <div class="principles">
+        <div class="principle"><b>本机处理</b><span>请求记录和工具输入默认仅在用户设备中处理。</span></div>
+        <div class="principle"><b>不设开发者服务器</b><span>随页不会把捕获的数据上传给开发者或分析平台。</span></div>
+        <div class="principle"><b>由用户控制</b><span>用户决定何时开始、停止、清空、复制或导出数据。</span></div>
+      </div>
+    </header>
+
+    <article class="policy-card">
+      <section>
+        <h2>1. 适用范围</h2>
+        <p>本政策适用于“随页”浏览器扩展。随页的单一用途是为开发者提供跟随当前网页的本地调试与内容处理能力，包括网络请求捕获、请求覆写、开发转换、二维码生成和内容差异比较。</p>
+      </section>
+
+      <section>
+        <h2>2. 随页处理的数据</h2>
+        <p>在用户主动开启并保持“捕获流量”功能期间，随页可能处理并在本机保存以下信息：</p>
+        <ul>
+          <li>浏览器标签页的 URL、网页标题、标签页标识和访问时间。</li>
+          <li>网络请求 URL、方法、类型、状态码、耗时、错误信息及重定向信息。</li>
+          <li>请求与响应 Header、Request Body 和 Response Body。</li>
+          <li>用户创建的请求覆写规则、扩展设置和数据保留偏好。</li>
+          <li>用户主动输入到内容转换、二维码或差异比较工具中的文本。</li>
+        </ul>
+        <div class="notice"><strong>敏感数据提示：</strong>完整请求或响应内容可能包含个人身份信息、身份验证凭据、个人通讯、位置、健康或财务信息。随页不会主动识别或分析这些类别，但原始网络内容可能包含它们。请仅在您有权调试的网页上开启捕获，并及时清理不再需要的记录。</div>
+      </section>
+
+      <section>
+        <h2>3. 数据用途</h2>
+        <p>上述数据仅用于用户可见的扩展功能：</p>
+        <ul>
+          <li>在侧边栏中显示、筛选和检查网络请求历史。</li>
+          <li>展示请求与响应详情、错误原因、耗时和正文。</li>
+          <li>按照用户创建并启用的规则覆写请求 Header 或 Query 参数。</li>
+          <li>根据用户操作复制请求信息、生成 HAR 文件或执行本地内容处理。</li>
+        </ul>
+        <p>随页不会将这些数据用于广告、用户画像、信用评估或与上述功能无关的目的。</p>
+      </section>
+
+      <section>
+        <h2>4. 本机存储与保留</h2>
+        <p>请求历史、覆写规则、捕获状态和偏好设置通过浏览器提供的本地扩展存储保存在用户设备中。随页不使用云端同步保存请求内容。</p>
+        <p>用户可以在扩展中清空当前网页或全部网页的请求记录，也可以通过浏览器卸载扩展并移除扩展保存的数据。请求历史的数量与正文保留上限受扩展设置控制。</p>
+      </section>
+
+      <section>
+        <h2>5. 数据传输、分享与出售</h2>
+        <p><strong>随页不会把捕获记录、工具输入或覆写规则发送到开发者控制的服务器，也不会出售、出租或分享给第三方。</strong></p>
+        <p>当用户主动复制或导出数据时，相关内容会进入用户设备的剪贴板或下载文件；其后续保管和分享由用户自行控制。用户创建的覆写规则可能改变发送给目标网站的请求内容，该请求仍由浏览器发送至用户正在访问的目标网站。</p>
+      </section>
+
+      <section>
+        <h2>6. 浏览器权限</h2>
+        <ul class="permission-list">
+          <li><code>sidePanel</code><span>在浏览器侧边栏中显示随页的主要界面。</span></li>
+          <li><code>storage</code><span>在本机保存请求历史、覆写规则和用户偏好。</span></li>
+          <li><code>declarativeNetRequest</code><span>执行用户明确创建并启用的 Header 与 Query 覆写规则。</span></li>
+          <li><code>debugger</code><span>在用户开启捕获后读取请求生命周期、请求与响应 Header 以及正文；停止捕获后断开连接。</span></li>
+          <li><code>tabs</code><span>按照顶层网页标签整理请求，并跟随标签页切换、新建、刷新或关闭状态。</span></li>
+          <li><code>clipboardWrite</code><span>仅在用户点击复制按钮时写入请求信息、工具结果或二维码图片。</span></li>
+          <li><code>&lt;all_urls&gt;</code><span>让用户创建的覆写规则能够应用到用户指定、且安装前无法预知的 HTTP/HTTPS 网站。</span></li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>7. 用户选择与控制</h2>
+        <ul>
+          <li>用户可以随时开始或停止网络捕获。</li>
+          <li>用户可以停用或删除任意覆写规则。</li>
+          <li>用户可以清空单个网页或全部网页的请求记录。</li>
+          <li>用户可以通过浏览器扩展管理页面撤销权限或卸载随页。</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>8. 数据安全</h2>
+        <p>随页不提供远程账户、遥测或分析服务，扩展代码和依赖均包含在安装包中。由于请求记录可能包含敏感信息，请保护设备和浏览器配置文件，并避免在共享设备上长期保留记录或导出的 HAR 文件。</p>
+      </section>
+
+      <section class="limited-use">
+        <h2>9. Chrome Web Store Limited Use</h2>
+        <p>随页对通过 Chrome API 获得的信息的使用，将遵守 Chrome Web Store 用户数据政策，包括 Limited Use 要求。相关数据仅用于提供或改进随页向用户展示的核心功能。</p>
+      </section>
+
+      <section>
+        <h2>10. 政策更新与联系</h2>
+        <p>如果随页的数据处理方式发生变化，本政策将同步更新，并在需要时于扩展界面中向用户提供显著说明。用户可以通过随页在 Chrome 网上应用店商品详情页提供的支持渠道联系开发者。</p>
+        <p>有关 Chrome Web Store 用户数据规则，请参阅 <a href="https://developer.chrome.com/docs/webstore/program-policies/user-data-faq" rel="noreferrer">Chrome Web Store 用户数据政策说明</a>。</p>
+      </section>
+    </article>
+
+    <footer>© 2026 随页 · 数据默认仅在用户设备中处理</footer>
+  </main>
+</body>
+</html>
