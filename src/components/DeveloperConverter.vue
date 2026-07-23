@@ -3,6 +3,8 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { AlertTriangle, Check, Clipboard, Copy, LockKeyhole, RotateCcw, X } from 'lucide-vue-next'
 
 type ConverterCategory = 'json' | 'url' | 'base64' | 'jwt' | 'time' | 'generate'
+type ResultState = 'idle' | 'valid' | 'error'
+type ConverterDraft = { input: string; output: string; error: string; resultState: ResultState }
 
 const props = defineProps<{
   height: number
@@ -65,9 +67,18 @@ const activeAction = ref('format')
 const input = ref(examples.json)
 const output = ref('')
 const error = ref('')
-const resultState = ref<'idle' | 'valid' | 'error'>('idle')
+const resultState = ref<ResultState>('idle')
 const randomLength = ref(24)
 const inputRef = ref<HTMLTextAreaElement | null>(null)
+const converterDrafts = new Map<string, ConverterDraft>()
+const lastActionByCategory: Record<ConverterCategory, string> = {
+  json: 'format',
+  url: 'encode',
+  base64: 'encode',
+  jwt: 'parse',
+  time: 'timestamp-to-date',
+  generate: 'uuid',
+}
 
 const actions = computed(() => categoryActions[activeCategory.value])
 const inputDisabled = computed(() => activeCategory.value === 'generate')
@@ -75,14 +86,14 @@ const inputLabel = computed(() => {
   if (activeCategory.value === 'jwt') return 'JWT TOKEN'
   if (activeCategory.value === 'time') return activeAction.value === 'timestamp-to-date' ? '时间戳' : '日期时间'
   if (activeCategory.value === 'generate') return '生成选项'
-  if (activeCategory.value === 'url' && activeAction.value === 'params') return 'URL / QUERY'
+  if (activeCategory.value === 'url' && activeAction.value === 'params') return 'URL / QUERY / HASH'
   return '输入'
 })
 const outputLabel = computed(() => activeCategory.value === 'jwt' ? '解析结果' : activeCategory.value === 'url' && activeAction.value === 'params' ? 'JSON 参数' : '输出')
 const inputPlaceholder = computed(() => {
   if (activeCategory.value === 'json') return '粘贴 JSON 内容'
   if (activeCategory.value === 'url') {
-    if (activeAction.value === 'params') return '粘贴完整 URL、?a=1&b=2 或纯查询参数'
+    if (activeAction.value === 'params') return '粘贴完整 URL、?a=1&b=2、#WA=... 或纯参数'
     return activeAction.value === 'encode' ? '输入需要编码的 URL 或文本' : '输入需要解码的 URL 编码文本'
   }
   if (activeCategory.value === 'base64') return activeAction.value === 'encode' ? '输入需要编码的文本' : '输入 Base64 内容'
@@ -163,29 +174,85 @@ function parseJwt(value: string) {
   return { header, payload, signature: parts[2], signatureVerified: false }
 }
 
-function extractUrlParams(value: string) {
-  const trimmed = value.trim()
-  let query = trimmed
-  try {
-    if (/^[a-z][a-z\d+.-]*:\/\//i.test(trimmed)) query = new URL(trimmed).search.slice(1)
-    else {
-      const questionMark = trimmed.indexOf('?')
-      if (questionMark >= 0) query = trimmed.slice(questionMark + 1)
-      query = query.replace(/^\?/, '').split('#')[0]
+function parseUrlParamValue(value: string): unknown {
+  let candidate = value.trim()
+
+  // URLSearchParams 已经完成第一层解码；这里只继续处理可能被重复编码的 JSON。
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (candidate.startsWith('{') || candidate.startsWith('[')) {
+      try {
+        return JSON.parse(candidate)
+      } catch {
+        return value
+      }
     }
-  } catch {
-    throw new Error('URL 格式不正确，无法提取查询参数')
+
+    if (!/%(?:7b|5b)/i.test(candidate)) break
+    try {
+      const decoded = decodeURIComponent(candidate)
+      if (decoded === candidate) break
+      candidate = decoded.trim()
+    } catch {
+      break
+    }
   }
 
-  const params = new URLSearchParams(query)
-  const result: Record<string, string | string[]> = {}
-  params.forEach((itemValue, key) => {
-    const existing = result[key]
-    if (existing === undefined) result[key] = itemValue
-    else if (Array.isArray(existing)) existing.push(itemValue)
-    else result[key] = [existing, itemValue]
-  })
-  if (!Object.keys(result).length) throw new Error('没有找到可提取的 URL 查询参数')
+  return value
+}
+
+function extractUrlParams(value: string) {
+  const trimmed = value.trim()
+  const result: Record<string, unknown> = {}
+  const repeatedKeys = new Set<string>()
+
+  const appendParams = (params: URLSearchParams) => {
+    params.forEach((itemValue, key) => {
+      const parsedValue = parseUrlParamValue(itemValue)
+      if (!Object.prototype.hasOwnProperty.call(result, key)) {
+        result[key] = parsedValue
+        return
+      }
+
+      if (repeatedKeys.has(key)) (result[key] as unknown[]).push(parsedValue)
+      else {
+        result[key] = [result[key], parsedValue]
+        repeatedKeys.add(key)
+      }
+    })
+  }
+
+  const appendHash = (hash: string) => {
+    let hashParams = hash.replace(/^#/, '')
+    if (!hashParams) return
+
+    // 同时兼容 #a=1、#?a=1 与 #/route?a=1 这三种常见写法。
+    const questionMark = hashParams.indexOf('?')
+    if (questionMark >= 0 && !hashParams.slice(0, questionMark).includes('=')) {
+      hashParams = hashParams.slice(questionMark + 1)
+    }
+    hashParams = hashParams.replace(/^\?/, '')
+    if (hashParams.includes('=')) appendParams(new URLSearchParams(hashParams))
+  }
+
+  try {
+    if (/^[a-z][a-z\d+.-]*:\/\//i.test(trimmed)) {
+      const url = new URL(trimmed)
+      appendParams(url.searchParams)
+      appendHash(url.hash)
+    } else {
+      const hashIndex = trimmed.indexOf('#')
+      const beforeHash = hashIndex >= 0 ? trimmed.slice(0, hashIndex) : trimmed
+      const hash = hashIndex >= 0 ? trimmed.slice(hashIndex + 1) : ''
+      const questionMark = beforeHash.indexOf('?')
+      const query = (questionMark >= 0 ? beforeHash.slice(questionMark + 1) : beforeHash).replace(/^\?/, '')
+      if (query) appendParams(new URLSearchParams(query))
+      appendHash(hash)
+    }
+  } catch {
+    throw new Error('URL 格式不正确，无法提取 Query 或 Hash 参数')
+  }
+
+  if (!Object.keys(result).length) throw new Error('没有找到可提取的 URL Query 或 Hash 参数')
   return result
 }
 
@@ -259,23 +326,47 @@ function runTransform() {
   }
 }
 
+function draftKey(category = activeCategory.value, action = activeAction.value) {
+  return `${category}:${action}`
+}
+
+function saveCurrentDraft() {
+  converterDrafts.set(draftKey(), {
+    input: input.value,
+    output: output.value,
+    error: error.value,
+    resultState: resultState.value,
+  })
+  lastActionByCategory[activeCategory.value] = activeAction.value
+}
+
+function loadDraft(category: ConverterCategory, action: string, fallbackInput: string) {
+  const draft = converterDrafts.get(draftKey(category, action))
+  input.value = draft?.input ?? fallbackInput
+  output.value = draft?.output ?? ''
+  error.value = draft?.error ?? ''
+  resultState.value = draft?.resultState ?? 'idle'
+  return !!draft
+}
+
 function chooseCategory(category: ConverterCategory) {
+  if (category === activeCategory.value) return
+  saveCurrentDraft()
   activeCategory.value = category
-  activeAction.value = categoryActions[category][0].value
-  input.value = examples[category]
-  output.value = ''
-  error.value = ''
-  resultState.value = 'idle'
-  if (category === 'json' || category === 'time' || category === 'generate') runTransform()
+  activeAction.value = lastActionByCategory[category]
+  const restored = loadDraft(category, activeAction.value, examples[category])
+  if (!restored && (category === 'json' || category === 'time' || category === 'generate')) runTransform()
   void nextTick(() => inputRef.value?.focus())
 }
 
 function chooseAction(action: string) {
+  if (action === activeAction.value) return
+  const previousInput = input.value
+  saveCurrentDraft()
   activeAction.value = action
-  output.value = ''
-  error.value = ''
-  resultState.value = 'idle'
-  if (activeCategory.value === 'generate') runTransform()
+  lastActionByCategory[activeCategory.value] = action
+  const restored = loadDraft(activeCategory.value, action, previousInput || examples[activeCategory.value])
+  if (!restored && activeCategory.value === 'generate') runTransform()
 }
 
 function clearAll() {
@@ -301,7 +392,6 @@ onMounted(runTransform)
     <button class="resize-handle" title="拖动调整工具高度" aria-label="拖动调整开发转换工具高度" @pointerdown="emit('resizeStart', $event)"><i /></button>
     <header class="converter-header">
       <div>
-        <small>本地开发工具</small>
         <h2>开发转换</h2>
       </div>
       <span class="local-only"><LockKeyhole :size="13" />仅在本机处理</span>
@@ -322,7 +412,7 @@ onMounted(runTransform)
         <button v-for="length in [16, 24, 32, 64]" :key="length" type="button" :class="{ active: randomLength === length }" @click="randomLength = length">{{ length }}</button>
       </div>
 
-      <div class="converter-editor-grid" :class="{ 'single-output': inputDisabled }">
+      <div class="converter-editor-grid" :class="{ 'single-output': inputDisabled, 'compact-input': activeCategory === 'url' && activeAction === 'params' }">
         <section v-if="!inputDisabled" class="converter-code-card">
           <header><span>{{ inputLabel }}</span><button v-if="!inputDisabled" type="button" @click="copyValue(input, '输入内容')"><Copy :size="13" />复制</button></header>
           <textarea ref="inputRef" v-model="input" spellcheck="false" :placeholder="inputPlaceholder" @keydown.ctrl.enter.prevent="runTransform" @keydown.meta.enter.prevent="runTransform" />

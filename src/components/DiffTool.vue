@@ -192,7 +192,7 @@ function syncInputScroll(side: 'left' | 'right', event: Event) {
   <section class="diff-sheet utility-sheet resizable-sheet" :class="{ dragging }" :style="{ height: `${height}px` }" role="dialog" aria-modal="true" aria-label="内容对比工具">
     <button class="resize-handle" title="拖动调整工具高度" aria-label="拖动调整内容对比工具高度" @pointerdown="emit('resizeStart', $event)"><i /></button>
     <header class="utility-sheet-header">
-      <div><small>本地开发工具</small><h2>内容对比</h2></div>
+      <div><h2>内容对比</h2></div>
       <span class="utility-local-state"><LockKeyhole :size="13" />仅在本机处理</span>
       <button class="utility-close" type="button" aria-label="关闭内容对比工具" @click="emit('close')"><X :size="18" /></button>
     </header>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { AlertTriangle, Check, ChevronDown, Copy, Download, FileCode2, LoaderCircle, LockKeyhole, QrCode, SlidersHorizontal, X } from 'lucide-vue-next'
+import { AlertTriangle, Check, ChevronDown, Copy, Download, FileCode2, LoaderCircle, LockKeyhole, Maximize2, QrCode, SlidersHorizontal, X } from 'lucide-vue-next'
 import QRCode from 'qrcode'
 
 type ErrorCorrectionLevel = 'L' | 'M' | 'Q' | 'H'
@@ -16,7 +16,7 @@ const emit = defineEmits<{
   notify: [message: string, tone?: 'success' | 'error' | 'info']
 }>()
 
-const sizeOptions = [256, 512, 1024]
+const sizeOptions = [256, 512, 1024, 2048]
 const levelOptions: Array<{ value: ErrorCorrectionLevel; label: string; description: string }> = [
   { value: 'L', label: 'L', description: '7%' },
   { value: 'M', label: 'M', description: '15%' },
@@ -34,7 +34,7 @@ const palettes = [
 const content = ref('')
 const size = ref(512)
 const level = ref<ErrorCorrectionLevel>('M')
-const margin = ref(2)
+const margin = ref(4)
 const paletteId = ref('ink')
 const qrDataUrl = ref('')
 const qrSvg = ref('')
@@ -44,7 +44,13 @@ const dirty = ref(false)
 const initialized = ref(false)
 const showSettings = ref(false)
 const copyState = ref<'idle' | 'copying' | 'success' | 'error'>('idle')
+const qrVersion = ref(0)
+const moduleCount = ref(0)
+const pixelsPerModule = ref(0)
+const autoOptimized = ref(false)
 let copyFeedbackTimer: number | undefined
+let largePreviewTimer: number | undefined
+let largePreviewUrl = ''
 
 const palette = computed(() => palettes.find(item => item.id === paletteId.value) || palettes[0])
 const statusText = computed(() => {
@@ -56,6 +62,13 @@ const statusText = computed(() => {
 })
 const canExport = computed(() => status.value === 'ready' && !dirty.value && !!qrDataUrl.value)
 const settingsSummary = computed(() => `${size.value}px · ${level.value} 级 · 边距 ${margin.value} · ${palette.value.label}`)
+const qrPreviewUrl = computed(() => qrSvg.value ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(qrSvg.value)}` : qrDataUrl.value)
+const isDenseQr = computed(() => moduleCount.value >= 100)
+const scanHint = computed(() => {
+  if (!canExport.value) return ''
+  if (isDenseQr.value) return `长内容已优化 · ${pixelsPerModule.value}px/码点 · 侧栏较窄时请使用大图扫描`
+  return `${pixelsPerModule.value}px/码点 · 当前清晰度适合扫描`
+})
 
 async function getCurrentTabUrl() {
   if (location.protocol === 'chrome-extension:' && typeof chrome !== 'undefined' && chrome.tabs?.query) {
@@ -79,10 +92,24 @@ async function generateQr() {
   status.value = 'generating'
   error.value = ''
   try {
+    const byteLength = new TextEncoder().encode(value).byteLength
+    const longContent = byteLength >= 700
+    const plannedLevel: ErrorCorrectionLevel = longContent ? 'L' : level.value
+    const plannedMargin = longContent ? Math.max(4, margin.value) : margin.value
+    const qrModel = QRCode.create(value, { errorCorrectionLevel: plannedLevel })
+    const targetPixelsPerModule = longContent ? 8 : 4
+    const minimumSize = (qrModel.modules.size + plannedMargin * 2) * targetPixelsPerModule
+    const recommendedSize = sizeOptions.find(option => option >= minimumSize) || sizeOptions[sizeOptions.length - 1]
+    const plannedSize = Math.max(size.value, recommendedSize)
+    const optimized = plannedLevel !== level.value || plannedMargin !== margin.value || plannedSize !== size.value
+
+    level.value = plannedLevel
+    margin.value = plannedMargin
+    size.value = plannedSize
     const options = {
-      width: size.value,
-      margin: margin.value,
-      errorCorrectionLevel: level.value,
+      width: plannedSize,
+      margin: plannedMargin,
+      errorCorrectionLevel: plannedLevel,
       color: { dark: palette.value.dark, light: palette.value.light },
     }
     const [dataUrl, svg] = await Promise.all([
@@ -91,12 +118,35 @@ async function generateQr() {
     ])
     qrDataUrl.value = dataUrl
     qrSvg.value = svg
+    qrVersion.value = qrModel.version
+    moduleCount.value = qrModel.modules.size
+    pixelsPerModule.value = Math.floor(plannedSize / (qrModel.modules.size + plannedMargin * 2))
+    autoOptimized.value = optimized
     dirty.value = false
     status.value = 'ready'
+    if (optimized && initialized.value) emit('notify', `长内容已自动优化为 ${plannedSize}px · ${plannedLevel} 级容错 · ${plannedMargin} 模块留白`, 'info')
   } catch (reason) {
     status.value = 'error'
     error.value = reason instanceof Error ? reason.message : '二维码生成失败，请缩短内容后重试'
   }
+}
+
+function openLargePreview() {
+  if (!canExport.value || !qrSvg.value) return
+  if (largePreviewTimer) window.clearTimeout(largePreviewTimer)
+  if (largePreviewUrl) URL.revokeObjectURL(largePreviewUrl)
+  largePreviewUrl = URL.createObjectURL(new Blob([qrSvg.value], { type: 'image/svg+xml;charset=utf-8' }))
+  const preview = window.open(largePreviewUrl, '_blank')
+  if (!preview) {
+    emit('notify', '浏览器阻止了大图窗口，请允许弹出窗口或下载 SVG', 'error')
+    return
+  }
+  preview.opener = null
+  emit('notify', '已打开大图二维码', 'success')
+  largePreviewTimer = window.setTimeout(() => {
+    URL.revokeObjectURL(largePreviewUrl)
+    largePreviewUrl = ''
+  }, 60_000)
 }
 
 function downloadFile(url: string, filename: string) {
@@ -149,6 +199,8 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   if (copyFeedbackTimer) window.clearTimeout(copyFeedbackTimer)
+  if (largePreviewTimer) window.clearTimeout(largePreviewTimer)
+  if (largePreviewUrl) URL.revokeObjectURL(largePreviewUrl)
 })
 </script>
 
@@ -156,7 +208,7 @@ onBeforeUnmount(() => {
   <section class="qr-sheet utility-sheet resizable-sheet" :class="{ dragging }" :style="{ height: `${height}px` }" role="dialog" aria-modal="true" aria-label="二维码工具">
     <button class="resize-handle" title="拖动调整工具高度" aria-label="拖动调整二维码工具高度" @pointerdown="emit('resizeStart', $event)"><i /></button>
     <header class="utility-sheet-header">
-      <div><small>本地开发工具</small><h2>二维码</h2></div>
+      <div><h2>二维码</h2></div>
       <span class="utility-local-state"><LockKeyhole :size="13" />仅在本机处理</span>
       <button class="utility-close" type="button" aria-label="关闭二维码工具" @click="emit('close')"><X :size="18" /></button>
     </header>
@@ -180,11 +232,12 @@ onBeforeUnmount(() => {
       </section>
 
       <section class="qr-preview-card">
-        <header><span><QrCode :size="15" />预览</span><b v-if="canExport">{{ size }} px</b><em v-else-if="dirty">等待重新生成</em></header>
+        <header><span><QrCode :size="15" />预览</span><div class="qr-preview-actions"><b v-if="canExport">V{{ qrVersion }} · {{ moduleCount }} 格</b><button v-if="canExport" type="button" title="在新页面打开大图二维码" @click="openLargePreview"><Maximize2 :size="13" />大图</button><em v-else-if="dirty">等待重新生成</em></div></header>
         <div class="qr-preview-stage" :style="{ background: palette.light }">
-          <img v-if="qrDataUrl" :src="qrDataUrl" alt="二维码预览" />
+          <img v-if="qrPreviewUrl" :src="qrPreviewUrl" alt="二维码预览" />
           <div v-else class="qr-preview-empty"><AlertTriangle :size="24" /><span>{{ error || '二维码将在这里显示' }}</span></div>
         </div>
+        <div v-if="scanHint" class="qr-scan-hint" :class="{ dense: isDenseQr, optimized: autoOptimized }"><Check :size="13" /><span>{{ scanHint }}</span></div>
       </section>
     </div>
 
